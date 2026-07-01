@@ -1,0 +1,9 @@
+date,product,amount,category,notes
+2026-01-15,Widget A,150.50,electronics,  first order
+2026-01-16,Widget B,89.99,Electronics,
+2026-01-17,Gadget C,250.00,toys,discount applied
+2026-01-18,Widget A,150.50,ELECTRONICS,reorder
+2026-01-19,Gadget C,250.00,Toys,
+2026-01-20,Thing D,15.00,books,  urgent delivery requested
+2026-01-21,Thing D,15.00,Books,
+2026-01-22,Widget A,150.50,electronics,

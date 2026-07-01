@@ -33,16 +33,14 @@ class Forecast:
         """The day with the highest temperature."""
         if not self.days:
             return None
-        # BUG: This sorts by temp_low instead of temp_high
-        return max(self.days, key=lambda d: d.temp_low)
+        return max(self.days, key=lambda d: d.temp_high)
 
     @property
     def coldest_day(self) -> Optional[DayForecast]:
         """The day with the lowest temperature."""
         if not self.days:
             return None
-        # BUG: This sorts by temp_high instead of temp_low
-        return min(self.days, key=lambda d: d.temp_high)
+        return min(self.days, key=lambda d: d.temp_low)
 
 
 class WeatherClient:
@@ -72,8 +70,7 @@ class WeatherClient:
             raise ValueError(f"Unknown city: {city}")
 
         raw = self._mock_data[city]
-        # BUG: This reverses the list, so days are in wrong order
-        days = [DayForecast(**d) for d in reversed(raw)]
+        days = [DayForecast(**d) for d in raw]
 
         return Forecast(city=city, days=days)
 

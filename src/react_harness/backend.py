@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 PRICING: dict[str, tuple[float, float]] = {
     "z-ai/glm-5.2": (0.50, 2.00),
     "anthropic/claude-sonnet-4": (3.00, 15.00),
-    "anthropic/claude-opus-4": (15.00, 75.00),
+    "anthropic/claude-sonnet-4.5": (3.00, 15.00),
+    "anthropic/claude-opus-4.8": (5.00, 25.00),
     "openai/gpt-4o": (2.50, 10.00),
     "openai/gpt-4o-mini": (0.15, 0.60),
     "google/gemini-2.5-flash": (0.15, 0.60),
