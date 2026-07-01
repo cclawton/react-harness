@@ -58,7 +58,6 @@ class InventorySystem:
     def get_movements(self, sku: str) -> list[Movement]:
         """Get all movements for a SKU, sorted by timestamp (chronological)."""
         sku_moves = [m for m in self.movements if m.sku == sku]
-        # FIXED (Bug 1): Sorted by timestamp (chronological) instead of ID (arrival order)
         return sorted(sku_moves, key=lambda m: m.timestamp)
 
     def calculate_stock(self, sku: str) -> StockLevel:
@@ -77,7 +76,6 @@ class InventorySystem:
             elif m.type == "reserve":
                 reserved += m.quantity
 
-        # FIXED (Bug 4): available subtracts reserved AND pending_outbound
         available = current - reserved - pending_outbound
 
         return StockLevel(
@@ -100,12 +98,16 @@ class InventorySystem:
         total_out = sum(m.quantity for m in moves if m.type == "out")
         remaining = total_in - total_out
 
-        # FIXED (Bug 2): FIFO uses oldest first (chronological), not reversed (LIFO).
+        # BUG 2: Uses LIFO instead of FIFO.
+        # Gets the most recent "in" movements first (reversed),
+        # which is LIFO. Should get oldest first (chronological),
+        # which is FIFO.
         in_moves = [m for m in moves if m.type == "in"]
+        in_moves_reversed = list(reversed(in_moves))
 
         total_value = 0.0
         units_to_value = remaining
-        for m in in_moves:
+        for m in in_moves_reversed:
             if units_to_value <= 0:
                 break
             units_from_this = min(m.quantity, units_to_value)
@@ -128,7 +130,6 @@ class InventorySystem:
         Available = current stock - reserved - pending_outbound.
         """
         stock = self.calculate_stock(sku)
-        # FIXED (Bug 3): Uses available (accounts for reserved + pending_outbound)
         return stock.available < self.reorder_point
 
     def generate_report(self, skus: list[str]) -> dict:
@@ -151,10 +152,10 @@ class InventorySystem:
         total_value = sum(i["total_value"] for i in items)
         total_reorder = sum(1 for i in items if i["needs_reorder"])
 
-        # FIXED (Bug 5): Keep total_inventory_value as float (no int truncation)
+        # BUG 5: Formats currency as int (truncates decimals)
         return {
             "items": items,
-            "total_inventory_value": float(total_value),
+            "total_inventory_value": total_value,
             "total_skus_needing_reorder": total_reorder,
             "report_timestamp": datetime.now().isoformat(),
         }

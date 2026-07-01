@@ -114,13 +114,17 @@ class Backend:
         max_tokens: int | None = None,
     ) -> ChatResult:
         """Send messages, return (text, usage_delta). Raises on API error."""
+        # Always set max_tokens — prevents OpenRouter pre-allocating
+        # 65k tokens per request and burning through credits.
+        if max_tokens is None:
+            max_tokens = self.config.max_tokens
+
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
+            "max_tokens": max_tokens,
         }
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
 
         resp = self._client.chat.completions.create(**kwargs)
 

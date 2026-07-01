@@ -42,6 +42,10 @@ class Config:
         default_factory=lambda: int(os.getenv("MAX_WALL_CLOCK_SECONDS", "3600"))
     )
 
+    # Max output tokens per API call — prevents OpenRouter pre-allocating
+    # huge token budgets that eat into credit balance.
+    max_tokens: int = field(default_factory=lambda: int(os.getenv("MAX_TOKENS", "4096")))
+
     # Working directory for tool execution
     workdir: Path = field(default_factory=lambda: Path.cwd())
 
