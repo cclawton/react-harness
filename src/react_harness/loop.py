@@ -219,18 +219,20 @@ def run_loop(
         record.actor_text = result.text
         messages.append({"role": "assistant", "content": result.text})
 
-        # Log actual output tokens this turn + dynamic bump if hitting 6k+
+        # Log actual output tokens this turn + dynamic bump if hitting the cap
         last_ct = actor.usage.completion_tokens - getattr(actor, "_prev_ct", 0)
         setattr(actor, "_prev_ct", actor.usage.completion_tokens)
         logger.info("  Actor output tokens this turn: %d (max_tokens=%d)", last_ct, current_max)
 
-        if last_ct >= 6000:
+        # Trigger on either (a) very high absolute tokens or (b) consistently hitting the current cap
+        hitting_cap = last_ct >= int(current_max * 0.85)
+        if last_ct >= 6000 or hitting_cap:
             streak = getattr(config, "_high_token_streak", 0) + 1
             config._high_token_streak = streak
             if streak >= 2:
                 new_max = min(16384, max(8192, current_max * 2))
                 config._effective_max_tokens = new_max
-                logger.warning("High token usage streak detected. Bumping max_tokens %d → %d", current_max, new_max)
+                logger.warning("High token usage / cap hit streak detected. Bumping max_tokens %d → %d", current_max, new_max)
         else:
             config._high_token_streak = 0
 
