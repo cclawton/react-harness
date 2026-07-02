@@ -60,6 +60,7 @@ RULES:
 - After writing code, run the tests to verify.
 - If something fails, read the error, understand it, and fix it. Don't retry blindly.
 - When the goal is met (especially when tests pass), call "done" IMMEDIATELY with a summary. Do not continue iterating once tests are green.
+- CRITICAL: You must ONLY edit files in the working directory that are part of the implementation (inventory.py). NEVER modify test files (test_inventory.py or any file containing tests). Doing so will cause immediate failure.
 
 Turn {turn} of {max_turns}. Budget remaining: ${budget_remaining:.4f}.
 """
