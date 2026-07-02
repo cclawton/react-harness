@@ -157,6 +157,8 @@ def run_loop(
         started_at=datetime.now().isoformat(),
     )
 
+    import os
+
     # The conversation history — accumulates across turns
     messages: list[dict[str, str]] = [
         {
@@ -203,7 +205,9 @@ def run_loop(
 
         # --- PLAN (model proposes next action) ---
         try:
-            result = actor.chat(messages, temperature=0.0)
+            # Dynamic max_tokens watch + bump (if turns consistently >6k output)
+            current_max = getattr(config, '_effective_max_tokens', config.max_tokens)
+            result = actor.chat(messages, temperature=0.0, max_tokens=current_max)
         except Exception as e:
             record.error = f"Actor API error: {e}"
             record.elapsed_seconds = time.time() - turn_start
@@ -214,6 +218,21 @@ def run_loop(
 
         record.actor_text = result.text
         messages.append({"role": "assistant", "content": result.text})
+
+        # Log actual output tokens this turn + dynamic bump if hitting 6k+
+        last_ct = actor.usage.completion_tokens - getattr(actor, "_prev_ct", 0)
+        setattr(actor, "_prev_ct", actor.usage.completion_tokens)
+        logger.info("  Actor output tokens this turn: %d (max_tokens=%d)", last_ct, current_max)
+
+        if last_ct >= 6000:
+            streak = getattr(config, "_high_token_streak", 0) + 1
+            config._high_token_streak = streak
+            if streak >= 2:
+                new_max = min(16384, max(8192, current_max * 2))
+                config._effective_max_tokens = new_max
+                logger.warning("High token usage streak detected. Bumping max_tokens %d → %d", current_max, new_max)
+        else:
+            config._high_token_streak = 0
 
         # --- Parse the action ---
         action = _extract_json(result.text)
