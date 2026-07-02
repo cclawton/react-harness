@@ -59,7 +59,7 @@ RULES:
 - Read files before editing them.
 - After writing code, run the tests to verify.
 - If something fails, read the error, understand it, and fix it. Don't retry blindly.
-- When the goal is met, call "done" with a summary.
+- When the goal is met (especially when tests pass), call "done" IMMEDIATELY with a summary. Do not continue iterating once tests are green.
 
 Turn {turn} of {max_turns}. Budget remaining: ${budget_remaining:.4f}.
 """
@@ -285,6 +285,15 @@ def run_loop(
             turn_num, config.max_turns, record.action_name,
             record.elapsed_seconds, actor.cost_usd,
         )
+
+        # Early verifier feedback every 8 turns
+        if turn_num % 8 == 0 and record.action_name != "done":
+            verify_result = _verify(goal, config, actor, verifier, messages)
+            if verify_result.get("passed"):
+                logger.info("Early verifier passed at turn %d — signalling completion", turn_num)
+                run.status = "success"
+                run.finalize(run.status, actor, verifier, verify_result)
+                return run
 
     else:
         # Loop exhausted all turns without "done"
