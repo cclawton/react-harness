@@ -15,7 +15,7 @@ I ran the same five coding tasks on GLM-5.2 and Claude Opus 4.8.
 
 The one task Opus dropped (recursive parser) is the interesting case: GLM solved it in 6 turns for $0.019. Opus took 16 turns, spent $1.77, and escalated.
 
-See [RESULTS.md](RESULTS.md) for the full comparison and numbers.
+See [RESULTS.md](RESULTS.md) for the full per-task table, aggregate metrics, and raw run data location (`runs/`).
 
 **Repo:** https://github.com/cclawton/react-harness
 
