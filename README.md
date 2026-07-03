@@ -4,11 +4,24 @@ A readable, instrumented ReAct (Reason + Act) loop for comparing LLM coding agen
 
 ## Why
 
-Static benchmarks (SWE-bench, FrontierSWE) tell you which model scores higher on 30-minute evals. They don't tell you what happens when you give a model a 90-minute multi-file job with real error recovery required. This harness runs the same ReAct loop across different models and measures what actually matters: success rate, tool-call efficiency, error recovery, and real dollar cost.
+Static benchmarks (SWE-bench, FrontierSWE) tell you which model scores higher on 30-minute evals. They don't tell you what happens when you give a model a multi-file job with real error recovery required. This harness runs the same ReAct loop across different models and measures what actually matters: success rate, tool-call efficiency, error recovery, and real dollar cost.
+
+## July 2026 Experiment
+
+I ran the same five coding tasks on GLM-5.2 and Claude Opus 4.8.
+
+- **GLM-5.2**: 5/5 completed for **$0.25** total (~57k tokens avg)
+- **Claude Opus 4.8**: 4/5 completed for **$6.29** total (~185k tokens avg)
+
+The one task Opus dropped (recursive parser) is the interesting case: GLM solved it in 6 turns for $0.019. Opus took 16 turns, spent $1.77, and escalated.
+
+See [RESULTS.md](RESULTS.md) for the full comparison and numbers.
+
+**Repo:** https://github.com/cclawton/react-harness
 
 ## Principles
 
-1. **Readable** — the entire loop logic fits in one file (`loop.py`). You can follow it top to bottom.
+1. **Readable** — the entire loop logic fits in one file (`src/react_harness/loop.py`).
 2. **Backend-agnostic** — swap any OpenRouter model without changing loop code.
 3. **Producer ≠ Verifier** — the model running the loop is not the model judging the result.
 4. **Instrumented** — every turn logged: tool calls, tokens, cost, elapsed time. Full run saved as JSON.
@@ -25,11 +38,23 @@ pip install -r requirements.txt
 
 # 2. Configure
 cp .env.example .env
-# Edit .env: add your OpenRouter API key
+# Edit .env: add your OpenRouter API key (OPENROUTER_API_KEY=...)
 
-# 3. Run
-python main.py --goal-file examples/smoke_test_goal.md --workdir examples/smoke_test
+# 3. Run a single task
+python main.py \
+  --actor-model z-ai/glm-5.2 \
+  --verifier-model z-ai/glm-5.2 \
+  --goal-file examples/recursive_parser_goal.md \
+  --workdir examples/recursive_parser_glm
 ```
+
+## Running the Full Comparison
+
+```bash
+./run_comparison.sh
+```
+
+This runs all 5 tasks on both models and appends to `runs/comparison_results.csv`.
 
 ## Architecture
 
@@ -43,7 +68,7 @@ src/react_harness/
 └── __init__.py
 main.py                 — CLI entry point
 runs/                   — JSON run records (auto-generated)
-examples/               — sample tasks
+examples/               — sample tasks with goal.md + workdir
 ```
 
 ## The Loop
@@ -76,16 +101,19 @@ The model communicates via a simple JSON protocol:
 
 ## What It Measures
 
-| Metric | Why |
-|--------|-----|
-| Success rate | Did it reach a working solution? |
-| Tool-call count | How many actions to get there? |
-| Error recovery | How many failed actions were recovered? |
-| Token cost | Real dollar cost per completed task |
-| Wall-clock time | How long in real seconds? |
-| Verifier confidence | Did the separate verifier agree it's done? |
+| Metric                | Why |
+|-----------------------|-----|
+| Success rate          | Did it reach a working solution? |
+| Tool-call count       | How many actions to get there? |
+| Error recovery        | How many failed actions were recovered? |
+| Token cost            | Real dollar cost per completed task |
+| Wall-clock time       | How long in real seconds? |
+| Verifier confidence   | Did the separate verifier agree it's done? |
 
-## Related
+## License
 
-- [[Loop Architect - June 2026]] — project brief
-- [[GitHub-Brand-Refresh-2026]] — feeds the "AI coding" pillar
+MIT — use it, fork it, run your own comparisons.
+
+---
+
+*My own tests, my own machine. Views mine, not my employer's.*

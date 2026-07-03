@@ -1,5 +1,8 @@
 .env
 __pycache__/
 *.pyc
-runs/*.json
 .venv/
+runs/*.json
+runs/comparison_results.csv
+# Keep a curated results/ directory for public evidence
+!results/
