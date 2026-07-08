@@ -1,10 +1,55 @@
 #!/bin/bash
-# Run all 5 examples x 2 models = 10 runs, collect results
-cd ~/Hacking/react-harness
+# Run all 5 examples x 2 models = 10 runs, collect results.
+# NOTE: this is a convenience runner, not a benchmark-grade fixture resetter.
+# For publishable comparisons, start each workdir from a clean fixture first.
 
-GOALS_DIR="examples"
+set -u
+cd "$(dirname "$0")"
+
 RESULTS_FILE="runs/comparison_results.csv"
-echo "example,model,status,turns,cost,duration_s,verifier_passed,verifier_confidence" > "$RESULTS_FILE"
+VERIFIER_MODEL="${VERIFIER_MODEL:-openai/gpt-4o-mini}"
+mkdir -p runs
+
+if [[ ! -f "$RESULTS_FILE" ]]; then
+  echo "example,actor_model,verifier_model,status,turns,cost,duration_s,verifier_passed,verifier_confidence,run_json" > "$RESULTS_FILE"
+fi
+
+append_latest_run() {
+  local example=$1
+  local actor_model=$2
+
+  python - "$RESULTS_FILE" "$example" "$actor_model" "$VERIFIER_MODEL" <<'PY'
+import csv
+import json
+import sys
+from pathlib import Path
+
+results_file, example, actor_model, verifier_model = sys.argv[1:]
+runs = sorted(Path("runs").glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+if not runs:
+    print("WARNING: no run JSON found; cannot append CSV row", file=sys.stderr)
+    raise SystemExit(0)
+run_path = runs[0]
+data = json.loads(run_path.read_text())
+verifier = data.get("verifier_result") or {}
+row = {
+    "example": example,
+    "actor_model": actor_model,
+    "verifier_model": verifier_model,
+    "status": data.get("status", ""),
+    "turns": data.get("total_turns", ""),
+    "cost": data.get("total_cost_usd", ""),
+    "duration_s": data.get("total_seconds", ""),
+    "verifier_passed": verifier.get("passed", ""),
+    "verifier_confidence": verifier.get("confidence", ""),
+    "run_json": str(run_path),
+}
+with open(results_file, "a", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=list(row))
+    writer.writerow(row)
+print(f"CSV ROW: {row}")
+PY
+}
 
 run_example() {
   local example=$1
@@ -15,18 +60,22 @@ run_example() {
 
   echo "============================================"
   echo "RUNNING: ${label}"
+  echo "Verifier: ${VERIFIER_MODEL}"
   echo "============================================"
 
   python main.py \
     --actor-model "$model" \
-    --verifier-model "$model" \
+    --verifier-model "$VERIFIER_MODEL" \
     --goal "$goal" \
     --workdir "$workdir" \
     --max-turns 30 2>&1 | tee "/tmp/run_${label}.log"
+  local rc=${PIPESTATUS[0]}
 
-  # Extract the result line
-  local result=$(grep "RESULT:" "/tmp/run_${label}.log" 2>/dev/null | head -1)
+  local result
+  result=$(grep "RESULT:" "/tmp/run_${label}.log" 2>/dev/null | head -1 || true)
   echo "RESULT LINE: $result"
+  append_latest_run "$example" "$model"
+  return "$rc"
 }
 
 # --- GLM runs ---
@@ -71,4 +120,5 @@ echo "ALL RUNS COMPLETE"
 echo "============================================"
 echo ""
 echo "Run records in runs/*.json"
+echo "CSV summary in $RESULTS_FILE"
 echo "Logs in /tmp/run_*.log"

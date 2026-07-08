@@ -15,6 +15,21 @@ from .config import Config
 MAX_OUTPUT = 8000
 
 
+def _safe_path(config: Config, path: str) -> Path:
+    """Resolve a model-supplied path and ensure it stays inside workdir."""
+    candidate = Path(path)
+    if candidate.is_absolute():
+        raise ValueError("absolute paths are not allowed")
+
+    workdir = config.workdir.resolve()
+    full = (workdir / candidate).resolve()
+    try:
+        full.relative_to(workdir)
+    except ValueError as exc:
+        raise ValueError("path escapes the working directory") from exc
+    return full
+
+
 def _truncate(text: str, limit: int = MAX_OUTPUT) -> str:
     if len(text) <= limit:
         return text
@@ -61,7 +76,11 @@ def read_file(args: dict, config: Config) -> str:
     if not path:
         return "ERROR: missing 'path' argument"
 
-    full = Path(config.workdir) / path
+    try:
+        full = _safe_path(config, path)
+    except ValueError as e:
+        return f"ERROR: invalid path '{path}': {e}"
+
     if not full.exists():
         return f"ERROR: file not found: {path}"
     if full.is_dir():
@@ -81,8 +100,8 @@ def write_file(args: dict, config: Config) -> str:
     if not path:
         return "ERROR: missing 'path' argument"
 
-    full = Path(config.workdir) / path
     try:
+        full = _safe_path(config, path)
         full.parent.mkdir(parents=True, exist_ok=True)
         full.write_text(content)
         return f"OK: wrote {len(content)} chars to {path}"
@@ -93,15 +112,20 @@ def write_file(args: dict, config: Config) -> str:
 def list_files(args: dict, config: Config) -> str:
     """List files in a directory (recursive, relative paths)."""
     path = args.get("path", ".")
-    full = Path(config.workdir) / path
+    try:
+        full = _safe_path(config, path)
+    except ValueError as e:
+        return f"ERROR: invalid path '{path}': {e}"
+
     if not full.exists():
         return f"ERROR: directory not found: {path}"
 
+    workdir = config.workdir.resolve()
     lines = []
     for p in sorted(full.rglob("*")):
         if any(part in {".git", "__pycache__", "node_modules", ".venv"} for part in p.parts):
             continue
-        rel = p.relative_to(config.workdir)
+        rel = p.relative_to(workdir)
         kind = "DIR " if p.is_dir() else "FILE"
         lines.append(f"{kind}  {rel}")
     return _truncate("\n".join(lines)) if lines else "(empty)"

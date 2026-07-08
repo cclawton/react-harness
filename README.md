@@ -8,14 +8,16 @@ Static benchmarks (SWE-bench, FrontierSWE) tell you which model scores higher on
 
 ## July 2026 Experiment
 
-I ran the same five coding tasks on GLM-5.2 and Claude Opus 4.8.
+I ran the same five coding tasks on GLM-5.2 and Claude Opus 4.8. Treat this as a small anecdotal loop-engineering run, not a benchmark-grade verdict: it was one run per task/model, used a transcript-reading verifier, and did not originally publish raw traces in this repo.
+
+Observed in that run:
 
 - **GLM-5.2**: 5/5 completed for **$0.25** total (~57k tokens avg)
 - **Claude Opus 4.8**: 4/5 completed for **$6.29** total (~185k tokens avg)
 
-The one task Opus dropped (recursive parser) is the interesting case: GLM solved it in 6 turns for $0.019. Opus took 16 turns, spent $1.77, and escalated.
+The one task Opus dropped (recursive parser) is the interesting case: GLM solved it in 6 turns for $0.019. Opus took 16 turns, spent $1.77, and escalated because the verifier rejected the transcript.
 
-See [RESULTS.md](RESULTS.md) for the full per-task table, aggregate metrics, and raw run data location (`runs/`).
+See [RESULTS.md](RESULTS.md) for the full per-task table, caveats, and reproduction notes.
 
 **Repo:** https://github.com/cclawton/react-harness
 
@@ -43,7 +45,7 @@ cp .env.example .env
 # 3. Run a single task
 python main.py \
   --actor-model z-ai/glm-5.2 \
-  --verifier-model z-ai/glm-5.2 \
+  --verifier-model openai/gpt-4o-mini \
   --goal-file examples/recursive_parser_goal.md \
   --workdir examples/recursive_parser_glm
 ```
@@ -54,7 +56,7 @@ python main.py \
 ./run_comparison.sh
 ```
 
-This runs all 5 tasks on both models and appends to `runs/comparison_results.csv`.
+This runs all 5 tasks on both models and writes rows to `runs/comparison_results.csv`. By default it uses `openai/gpt-4o-mini` as a fixed verifier; override with `VERIFIER_MODEL=... ./run_comparison.sh`.
 
 ## Architecture
 

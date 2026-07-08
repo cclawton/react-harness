@@ -2,7 +2,7 @@
 
 **Models compared:** GLM-5.2 (`z-ai/glm-5.2`) vs Claude Opus 4.8 (`anthropic/claude-opus-4.8`)
 
-**Setup:** Identical ReAct loop, same 5 coding tasks, same tools, same verification, same termination rules (max 30 turns, $2 cap, 1h wall clock). Separate verifier model used for final check.
+**Setup:** Identical ReAct loop, same 5 coding tasks, same tools, same termination rules (max 30 turns, $2 cap, 1h wall clock). These numbers are from a small anecdotal run, not a benchmark-grade study: one run per task/model, no variance estimate, same-model transcript verification in the original runner, and no independent final pytest rerun in the first published code.
 
 **Tasks** (all self-contained in `examples/`):
 - `csv_normalizer`
@@ -49,7 +49,7 @@
 
 **Claude Opus 4.8**  
 - 16 turns, $1.7705, 267k tokens  
-- Escalated after hitting cost/turn limits.  
+- Escalated because the transcript verifier rejected the result.  
 - Overthought an algorithmic task, repeatedly revised approach instead of converging.
 
 ## Key Findings
@@ -64,16 +64,17 @@
 
 ## Run Data Location
 
-All raw run records live in the repository at:
+Raw run records are generated locally under:
 
 ```
 runs/
-├── 20260701-*.json
-├── 20260702-*.json
-└── comparison_results.csv   (summary, populated by run_comparison.sh)
+├── *.json
+└── comparison_results.csv
 ```
 
-Each JSON contains the full turn-by-turn trace, tool calls, token usage, costs, and final status.
+The original public repo did not commit those generated files because `.gitignore` excludes them. For any future published comparison, commit a curated `results/` bundle with the raw JSON traces, CSV summary, pricing snapshot, and fixture reset instructions.
+
+Each JSON contains the full turn-by-turn trace, tool calls, token usage, costs, final test observation, and final status.
 
 ## Reproducibility
 
@@ -85,12 +86,16 @@ pip install -r requirements.txt
 cp .env.example .env   # add your OpenRouter key
 
 # Run the full comparison (10 runs)
+# Uses openai/gpt-4o-mini as a fixed verifier by default.
 ./run_comparison.sh
+
+# Or choose a verifier explicitly
+VERIFIER_MODEL=anthropic/claude-sonnet-4.5 ./run_comparison.sh
 
 # Or run a single task
 python main.py \
   --actor-model z-ai/glm-5.2 \
-  --verifier-model z-ai/glm-5.2 \
+  --verifier-model openai/gpt-4o-mini \
   --goal-file examples/recursive_parser_goal.md \
   --workdir examples/recursive_parser_glm
 ```

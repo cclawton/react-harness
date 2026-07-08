@@ -60,7 +60,7 @@ RULES:
 - After writing code, run the tests to verify.
 - If something fails, read the error, understand it, and fix it. Don't retry blindly.
 - When the goal is met (especially when tests pass), call "done" IMMEDIATELY with a summary. Do not continue iterating once tests are green.
-- CRITICAL: You must ONLY edit files in the working directory that are part of the implementation (inventory.py). NEVER modify test files (test_inventory.py or any file containing tests). Doing so will cause immediate failure.
+- CRITICAL: You must ONLY edit implementation files needed for the goal. NEVER modify test files or fixtures unless the goal explicitly says to. Doing so will cause immediate failure.
 
 Turn {turn} of {max_turns}. Budget remaining: ${budget_remaining:.4f}.
 """
@@ -266,7 +266,17 @@ def run_loop(
             # --- VERIFY (separate verifier) ---
             verify_result = _verify(goal, config, actor, verifier, messages)
             if verify_result["passed"]:
-                run.status = "success"
+                final_test_record = _run_final_tests(config, len(run.turns) + 1, actor.cost_usd)
+                run.add_turn(final_test_record)
+                if final_test_record.error:
+                    verify_result = {
+                        **verify_result,
+                        "passed": False,
+                        "reason": f"Verifier passed, but independent final tests failed: {final_test_record.error}",
+                    }
+                    run.status = "escalated"
+                else:
+                    run.status = "success"
             else:
                 run.status = "escalated"
             run.finalize(run.status, actor, verifier, verify_result)
@@ -291,6 +301,17 @@ def run_loop(
         if turn_num % 8 == 0 and record.action_name != "done":
             verify_result = _verify(goal, config, actor, verifier, messages)
             if verify_result.get("passed"):
+                final_test_record = _run_final_tests(config, len(run.turns) + 1, actor.cost_usd)
+                run.add_turn(final_test_record)
+                if final_test_record.error:
+                    verify_result = {
+                        **verify_result,
+                        "passed": False,
+                        "reason": f"Early verifier passed, but independent final tests failed: {final_test_record.error}",
+                    }
+                    run.status = "escalated"
+                    run.finalize(run.status, actor, verifier, verify_result)
+                    return run
                 logger.info("Early verifier passed at turn %d — signalling completion", turn_num)
                 run.status = "success"
                 run.finalize(run.status, actor, verifier, verify_result)
@@ -359,6 +380,31 @@ Respond with a JSON block:
         }
     except Exception as e:
         return {"passed": False, "reason": f"Verifier API error: {e}", "confidence": 0.0}
+
+
+def _run_final_tests(config: Config, turn: int, cost_so_far_usd: float) -> TurnRecord:
+    """Run an independent final test command after verifier approval.
+
+    The verifier reads the transcript; this check provides a ground-truth guardrail
+    for coding tasks by re-running the test suite from the harness side.
+    """
+    record = TurnRecord(turn=turn)
+    record.action_name = "(final_tests)"
+    record.action_args = {"command": config.final_test_command}
+    start = time.time()
+
+    observation = execute_tool(
+        "run_tests",
+        {"command": config.final_test_command, "timeout": config.final_test_timeout},
+        config,
+    )
+    record.observation = observation
+    record.elapsed_seconds = time.time() - start
+    record.cost_so_far_usd = cost_so_far_usd
+
+    if "[exit code: 0]" not in observation:
+        record.error = f"{config.final_test_command!r} did not exit cleanly"
+    return record
 
 
 def _summarize_conversation(conversation: list[dict[str, str]]) -> str:

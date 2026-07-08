@@ -9,6 +9,7 @@ when you add models or OpenRouter changes rates.
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -126,7 +127,27 @@ class Backend:
             "max_tokens": max_tokens,
         }
 
-        resp = self._client.chat.completions.create(**kwargs)
+        last_error: Exception | None = None
+        for attempt in range(1, self.config.api_retries + 1):
+            try:
+                resp = self._client.chat.completions.create(**kwargs)
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt >= self.config.api_retries:
+                    raise
+                delay = self.config.api_retry_base_seconds * (2 ** (attempt - 1))
+                logger.warning(
+                    "API call failed for %s (attempt %d/%d): %s; retrying in %.1fs",
+                    self.model,
+                    attempt,
+                    self.config.api_retries,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+        else:  # pragma: no cover - loop always raises or breaks
+            raise RuntimeError(f"API call failed: {last_error}")
 
         text = resp.choices[0].message.content or ""
         if resp.usage:

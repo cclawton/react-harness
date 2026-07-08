@@ -104,8 +104,11 @@ def main() -> int:
     print(f"{'='*60}")
     print(f"  Actor:    {config.actor_model}")
     print(f"  Verifier: {config.verifier_model}")
+    if config.actor_model == config.verifier_model:
+        print("  Warning: actor and verifier are the same model; use a fixed separate verifier for comparisons.")
     print(f"  Workdir:  {config.workdir}")
     print(f"  Limits:   {config.max_turns} turns | ${config.max_cost_usd} | {config.max_wall_clock_seconds}s")
+    print(f"  Final test: {config.final_test_command}")
     print(f"  Goal:     {goal[:200]}{'...' if len(goal) > 200 else ''}")
     print(f"{'='*60}")
     print()

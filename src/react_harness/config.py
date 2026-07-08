@@ -27,10 +27,17 @@ class Config:
         default_factory=lambda: os.getenv("OPENROUTER_APP_NAME", "react-harness")
     )
 
+    # API retry behaviour. Retries reduce benchmark noise from transient provider
+    # failures while still surfacing persistent failures as run failures.
+    api_retries: int = field(default_factory=lambda: int(os.getenv("API_RETRIES", "3")))
+    api_retry_base_seconds: float = field(
+        default_factory=lambda: float(os.getenv("API_RETRY_BASE_SECONDS", "1.0"))
+    )
+
     # Models
     actor_model: str = field(default_factory=lambda: os.getenv("ACTOR_MODEL", "z-ai/glm-5.2"))
     verifier_model: str = field(
-        default_factory=lambda: os.getenv("VERIFIER_MODEL", "z-ai/glm-5.2")
+        default_factory=lambda: os.getenv("VERIFIER_MODEL", "openai/gpt-4o-mini")
     )
 
     # Bounded termination
@@ -48,6 +55,15 @@ class Config:
 
     # Working directory for tool execution
     workdir: Path = field(default_factory=lambda: Path.cwd())
+
+    # Independent final verification. The loop re-runs this after a verifier pass
+    # so success is grounded in the test suite, not only the transcript judgment.
+    final_test_command: str = field(
+        default_factory=lambda: os.getenv("FINAL_TEST_COMMAND", "python -m pytest -q")
+    )
+    final_test_timeout: int = field(
+        default_factory=lambda: int(os.getenv("FINAL_TEST_TIMEOUT", "300"))
+    )
 
     # Run output
     runs_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "runs")
